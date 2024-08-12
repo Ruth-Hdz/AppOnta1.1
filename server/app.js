@@ -1,6 +1,18 @@
 import express from 'express';
 import cors from 'cors';
-import { getUserById, registerUser, loginUser, deleteUser, createCategory, getCategoriesByUserId, updateCategory, deleteCategory, createArticle, getArticlesByCategoryId, updateArticle, deleteArticle } from './database.js';
+import { 
+    getUserById, 
+    registerUser, 
+    loginUser, 
+    deleteUser, 
+    createCategory, 
+    getCategoriesByUserId, 
+    updateCategory, 
+    deleteCategory, 
+    createArticle, 
+    updateArticle, 
+    deleteArticle 
+} from './database.js';
 
 // Crea una instancia de Express
 const app = express();
@@ -12,7 +24,7 @@ const corsOptions = {
     credentials: true,
 };
 
-app.use(cors(corsOptions)); // Usa app después de definirlo
+app.use(cors(corsOptions)); // Usa cors antes de definir las rutas
 
 app.use(express.json());
 

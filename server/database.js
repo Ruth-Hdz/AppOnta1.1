@@ -69,15 +69,7 @@ export async function createCategory(nombre, icono, color, id_usuario) {
     }
 }
 
-export async function getCategoriesByUserId(id_usuario) {
-    try {
-        const query = 'SELECT * FROM Categoria WHERE id_usuario = ?';
-        const [rows] = await pool.execute(query, [id_usuario]);
-        return rows;
-    } catch (error) {
-        throw error;
-    }
-}
+
 
 export async function updateCategory(id, nombre, icono, color) {
     try {
@@ -110,10 +102,16 @@ export async function createArticle(titulo, texto, prioridad, id_categoria) {
     }
 }
 
-export async function getArticlesByCategoryId(id_categoria) {
+export async function getCategoriesByUserId(id_usuario) {
     try {
-        const query = 'SELECT * FROM Articulo WHERE id_categoria = ?';
-        const [rows] = await pool.execute(query, [id_categoria]);
+        const query = `
+            SELECT c.*, COUNT(a.id) AS numero_articulos
+            FROM Categoria c
+            LEFT JOIN Articulo a ON a.id_categoria = c.id
+            WHERE c.id_usuario = ?
+            GROUP BY c.id
+        `;
+        const [rows] = await pool.execute(query, [id_usuario]);
         return rows;
     } catch (error) {
         throw error;

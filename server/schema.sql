@@ -182,3 +182,16 @@ LEFT JOIN
     Articulo ON Categoria.id = Articulo.id_categoria
 WHERE 
     Categoria.id_usuario = (SELECT id FROM Usuario WHERE email = 'carlos@example.com');
+UPDATE Categoria SET icono = 'book' WHERE nombre = 'Libros';
+UPDATE Categoria SET icono = 'musical-notes' WHERE nombre = 'Música';
+UPDATE Categoria SET icono = 'restaurant' WHERE nombre = 'Recetas';
+UPDATE Categoria SET icono = 'airplane' WHERE nombre = 'Viajes';
+UPDATE Categoria SET icono = 'football' WHERE nombre = 'Deportes';
+UPDATE Categoria SET icono = 'laptop' WHERE nombre = 'Tecnología';
+UPDATE Categoria SET icono = 'film' WHERE nombre = 'Cine';
+UPDATE Categoria SET icono = 'color-palette' WHERE nombre = 'Arte';
+UPDATE Categoria SET icono = 'cafe' WHERE nombre = 'Café';
+UPDATE Categoria SET icono = 'flower' WHERE nombre = 'Jardinería';
+UPDATE Categoria SET icono = 'book-outline' WHERE nombre = 'Historia';
+UPDATE Categoria SET icono = 'sketch' WHERE nombre = 'Cómics';
+UPDATE Categoria SET icono = 'alert-circle-outline' WHERE nombre = 'Ejemplo Categoría';
