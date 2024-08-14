@@ -12,23 +12,29 @@ const pool = mysql.createPool({
 });
 
 // Funciones de Usuario
-export async function registerUser(nombre, email, contraseña, acepta_terminos) {
+export async function registerUser(nombre, correo_electronico, contrasena, acepta_terminos) {
     try {
-        const query = 'INSERT INTO Usuario (nombre, email, contraseña, acepta_terminos) VALUES (?, ?, ?, ?)';
-        const [results] = await pool.execute(query, [nombre, email, contraseña, acepta_terminos]);
+        const query = 'INSERT INTO Usuario (nombre, correo_electronico, contrasena, acepta_terminos) VALUES (?, ?, ?, ?)';
+        const [results] = await pool.execute(query, [nombre, correo_electronico, contrasena, acepta_terminos]);
         return results;
     } catch (error) {
         throw error;
     }
 }
 
-export async function loginUser(email, contraseña) {
+export async function loginUser(correo_electronico, contrasena) {
     try {
-        const query = 'SELECT * FROM Usuario WHERE email = ? AND contraseña = ?';
-        const [rows] = await pool.execute(query, [email, contraseña]);
+        if (!correo_electronico || !contrasena) {
+            throw new Error('Email o contraseña no proporcionados');
+        }
+
+        const query = 'SELECT * FROM Usuario WHERE correo_electronico = ? AND contrasena = ?';
+        const [rows] = await pool.execute(query, [correo_electronico, contrasena]);
+
         if (rows.length === 0) {
             throw new Error('Credenciales inválidas');
         }
+
         return rows[0];
     } catch (error) {
         throw error;
@@ -37,12 +43,47 @@ export async function loginUser(email, contraseña) {
 
 export async function getUserById(id) {
     try {
-        const query = 'SELECT * FROM Usuario WHERE id = ?';
-        const [rows] = await pool.execute(query, [id]);
-        if (rows.length === 0) {
+        // Consulta principal del usuario
+        const userQuery = 'SELECT * FROM Usuario WHERE id = ?';
+        const [userRows] = await pool.execute(userQuery, [id]);
+        
+        if (userRows.length === 0) {
             throw new Error('Usuario no encontrado');
         }
-        return rows[0];
+        
+        const user = userRows[0];
+
+        // Consulta para obtener categorías vinculadas al usuario
+        const categoriesQuery = 'SELECT * FROM Categoria WHERE id_usuario = ?';
+        const [categoriesRows] = await pool.execute(categoriesQuery, [id]);
+
+        // Consulta para obtener artículos vinculados a cada categoría
+        const articlesQuery = 'SELECT * FROM Articulo WHERE id_categoria IN (SELECT id FROM Categoria WHERE id_usuario = ?)';
+        const [articlesRows] = await pool.execute(articlesQuery, [id]);
+
+        return {
+            user,
+            categories: categoriesRows,
+            articles: articlesRows
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+export async function getArticleCountByUserId(id_usuario) {
+    try {
+        // Consulta para contar artículos por usuario
+        const query = `
+            SELECT COUNT(a.id) AS numero_articulos
+            FROM Articulo a
+            JOIN Categoria c ON a.id_categoria = c.id
+            WHERE c.id_usuario = ?
+        `;
+        const [rows] = await pool.execute(query, [id_usuario]);
+        
+        // Devuelve el conteo de artículos
+        return rows[0].numero_articulos;
     } catch (error) {
         throw error;
     }
@@ -69,8 +110,6 @@ export async function createCategory(nombre, icono, color, id_usuario) {
     }
 }
 
-
-
 export async function updateCategory(id, nombre, icono, color) {
     try {
         const query = 'UPDATE Categoria SET nombre = ?, icono = ?, color = ? WHERE id = ?';
@@ -83,9 +122,23 @@ export async function updateCategory(id, nombre, icono, color) {
 
 export async function deleteCategory(id) {
     try {
-        const query = 'DELETE FROM Categoria WHERE id = ?';
+        const query = 'DELETE FROM Categoria WHERE id = ?'; // Asegúrate de que el nombre de la tabla y el campo sean correctos
         const [results] = await pool.execute(query, [id]);
+        if (results.affectedRows === 0) {
+            throw new Error('Categoría no encontrada');
+        }
         return results;
+    } catch (error) {
+        console.error('Error en deleteCategory:', error.message); // Registra el error
+        throw error;
+    }
+}
+
+export async function categoryExists(id_categoria) {
+    try {
+        const query = 'SELECT COUNT(*) AS count FROM Categoria WHERE id = ?';
+        const [rows] = await pool.execute(query, [id_categoria]);
+        return rows[0].count > 0;
     } catch (error) {
         throw error;
     }
@@ -97,6 +150,26 @@ export async function createArticle(titulo, texto, prioridad, id_categoria) {
         const query = 'INSERT INTO Articulo (titulo, texto, prioridad, id_categoria) VALUES (?, ?, ?, ?)';
         const [results] = await pool.execute(query, [titulo, texto, prioridad, id_categoria]);
         return results;
+    } catch (error) {
+        throw error;
+    }
+}
+
+export async function getArticlesByUserId(id) {
+    try {
+        const query = 'SELECT * FROM Articulo WHERE id_usuario = ?';
+        const [rows] = await pool.execute(query, [id]);
+        return rows;
+    } catch (error) {
+        throw error;
+    }
+}
+
+export async function getAllArticles() {
+    try {
+        const query = 'SELECT * FROM Articulo'; // Asegúrate de que el nombre de la tabla sea correcto
+        const [rows] = await pool.execute(query);
+        return rows;
     } catch (error) {
         throw error;
     }

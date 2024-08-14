@@ -9,9 +9,12 @@ import {
     getCategoriesByUserId, 
     updateCategory, 
     deleteCategory, 
-    createArticle, 
+    createArticle,
+    getArticlesByUserId, 
     updateArticle, 
-    deleteArticle 
+    deleteArticle,
+    getArticleCountByUserId,
+    categoryExists
 } from './database.js';
 
 // Crea una instancia de Express
@@ -19,46 +22,82 @@ const app = express();
 
 // Configuración de CORS
 const corsOptions = {
-    origin: '*', // Permite todas las orígenes durante el desarrollo
+    origin: process.env.CORS_ORIGIN || '*',
     methods: ["POST", "GET", "PUT", "DELETE"],
     credentials: true,
 };
 
-app.use(cors(corsOptions)); // Usa cors antes de definir las rutas
-
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// Middleware para verificar autenticación (ejemplo de protección de ruta)
+const authenticate = (req, res, next) => {
+    // Implementa tu lógica de autenticación aquí
+    next();
+};
 
 // Rutas de Usuario
 app.post('/register', async (req, res) => {
     try {
-        const { nombre, email, contraseña, acepta_terminos } = req.body;
-        const result = await registerUser(nombre, email, contraseña, acepta_terminos);
-        res.status(201).json(result);
+        const { nombre, correo_electronico, contrasena, acepta_terminos } = req.body;
+        if (!nombre || !correo_electronico || !contrasena || !acepta_terminos) {
+            return res.status(400).json({ error: 'Todos los campos son requeridos' });
+        }
+
+        const result = await registerUser(nombre, correo_electronico, contrasena, acepta_terminos);
+
+        if (result.affectedRows > 0) {
+            res.status(201).json({
+                message: 'Usuario registrado con éxito',
+                userId: result.insertId
+            });
+        } else {
+            res.status(400).json({ message: 'No se pudo registrar al usuario' });
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 app.post('/login', async (req, res) => {
+    console.log('Datos recibidos:', req.body);
+    const { correo_electronico, contrasena } = req.body;
+
+    if (!correo_electronico || !contrasena) {
+        return res.status(400).json({ error: 'Email o contraseña no proporcionados' });
+    }
+
     try {
-        const { email, contraseña } = req.body;
-        const user = await loginUser(email, contraseña);
-        res.json(user);
+        const user = await loginUser(correo_electronico, contrasena);
+        res.status(200).json({ user });
     } catch (error) {
         res.status(401).json({ error: error.message });
     }
 });
 
-app.get('/user/:id', async (req, res) => {
+app.get('/user/:id', authenticate, async (req, res) => {
     try {
-        const user = await getUserById(req.params.id);
-        res.json(user);
+        const userInfo = await getUserById(req.params.id);
+        res.json(userInfo);
     } catch (error) {
         res.status(404).json({ error: error.message });
     }
 });
 
-app.delete('/user/:id', async (req, res) => {
+app.get('/article_count/:id_usuario', authenticate, async (req, res) => {
+    try {
+        const id_usuario = req.params.id_usuario;
+        if (!id_usuario) {
+            return res.status(400).json({ error: 'User ID is missing' });
+        }
+        const articleCount = await getArticleCountByUserId(id_usuario);
+        res.json({ numero_articulos: articleCount });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/user/:id', authenticate, async (req, res) => {
     try {
         await deleteUser(req.params.id);
         res.status(204).end();
@@ -68,7 +107,7 @@ app.delete('/user/:id', async (req, res) => {
 });
 
 // Rutas de Categoría
-app.post('/categories', async (req, res) => {
+app.post('/categories', authenticate, async (req, res) => {
     try {
         const { nombre, icono, color, id_usuario } = req.body;
         const result = await createCategory(nombre, icono, color, id_usuario);
@@ -78,7 +117,7 @@ app.post('/categories', async (req, res) => {
     }
 });
 
-app.get('/categories/:id_usuario', async (req, res) => {
+app.get('/categories/:id_usuario', authenticate, async (req, res) => {
     try {
         const categories = await getCategoriesByUserId(req.params.id_usuario);
         res.json(categories);
@@ -87,7 +126,7 @@ app.get('/categories/:id_usuario', async (req, res) => {
     }
 });
 
-app.put('/categories/:id', async (req, res) => {
+app.put('/categories/:id', authenticate, async (req, res) => {
     try {
         const { nombre, icono, color } = req.body;
         const result = await updateCategory(req.params.id, nombre, icono, color);
@@ -97,36 +136,51 @@ app.put('/categories/:id', async (req, res) => {
     }
 });
 
-app.delete('/categories/:id', async (req, res) => {
+app.delete('/categories/:id', authenticate, async (req, res) => {
     try {
         await deleteCategory(req.params.id);
-        res.status(204).end();
+        res.status(200).send('Category deleted');
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).send('Internal Server Error');
     }
 });
 
 // Rutas de Artículo
-app.post('/articles', async (req, res) => {
+app.post('/articles', authenticate, async (req, res) => {
     try {
         const { titulo, texto, prioridad, id_categoria } = req.body;
+
+        if (!titulo || !id_categoria) {
+            return res.status(400).json({ error: 'Faltan datos requeridos' });
+        }
+
+        const categoryExistsResult = await categoryExists(id_categoria);
+        if (!categoryExistsResult) {
+            return res.status(400).json({ error: 'Categoría no encontrada' });
+        }
+
         const result = await createArticle(titulo, texto, prioridad, id_categoria);
         res.status(201).json(result);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error(error);
+        res.status(500).json({ error: 'Error al crear el artículo' });
     }
 });
 
-app.get('/articles/:id_categoria', async (req, res) => {
+app.get('/articles_list/:id', async (req, res) => {
     try {
-        const articles = await getArticlesByCategoryId(req.params.id_categoria);
+        const id = req.params.id;
+        if (!id) {
+            return res.status(400).json({ error: 'User ID is missing' });
+        }
+        const articles = await getArticlesByUserId(id);
         res.json(articles);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.put('/articles/:id', async (req, res) => {
+app.put('/articles/:id', authenticate, async (req, res) => {
     try {
         const { titulo, texto, prioridad, id_categoria } = req.body;
         const result = await updateArticle(req.params.id, titulo, texto, prioridad, id_categoria);
@@ -136,7 +190,7 @@ app.put('/articles/:id', async (req, res) => {
     }
 });
 
-app.delete('/articles/:id', async (req, res) => {
+app.delete('/articles/:id', authenticate, async (req, res) => {
     try {
         await deleteArticle(req.params.id);
         res.status(204).end();
@@ -146,6 +200,7 @@ app.delete('/articles/:id', async (req, res) => {
 });
 
 // Inicia el servidor
-app.listen(8080, '0.0.0.0', () => {
-    console.log('Servidor corriendo en el puerto 8080');
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
