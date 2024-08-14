@@ -110,12 +110,27 @@ app.delete('/user/:id', authenticate, async (req, res) => {
 app.post('/categories', authenticate, async (req, res) => {
     try {
         const { nombre, icono, color, id_usuario } = req.body;
+
+        // Llama a la función para crear la categoría
         const result = await createCategory(nombre, icono, color, id_usuario);
-        res.status(201).json(result);
+
+        // Responde con un mensaje de éxito y los detalles de la categoría creada
+        res.status(201).json({
+            message: 'Categoría creada con éxito',
+            category: {
+                id: result.insertId,
+                nombre,
+                icono,
+                color,
+                id_usuario
+            }
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error(error);
+        res.status(500).json({ error: 'Error al crear la categoría' });
     }
 });
+
 
 app.get('/categories/:id_usuario', authenticate, async (req, res) => {
     try {
@@ -160,7 +175,12 @@ app.post('/articles', authenticate, async (req, res) => {
         }
 
         const result = await createArticle(titulo, texto, prioridad, id_categoria);
-        res.status(201).json(result);
+
+        // Añade el mensaje de éxito junto con la respuesta del artículo creado
+        res.status(201).json({
+            message: 'Artículo creado con éxito',
+            article: result
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Error al crear el artículo' });
@@ -180,15 +200,23 @@ app.get('/articles_list/:id', async (req, res) => {
     }
 });
 
+// CREACION DE ARTICULO
 app.put('/articles/:id', authenticate, async (req, res) => {
     try {
         const { titulo, texto, prioridad, id_categoria } = req.body;
         const result = await updateArticle(req.params.id, titulo, texto, prioridad, id_categoria);
-        res.json(result);
+
+        // Verifica si se actualizó al menos una fila
+        if (result.affectedRows > 0) {
+            res.json({ message: 'Artículo actualizado con éxito', result });
+        } else {
+            res.status(404).json({ message: 'Artículo no encontrado' });
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
+
 
 app.delete('/articles/:id', authenticate, async (req, res) => {
     try {

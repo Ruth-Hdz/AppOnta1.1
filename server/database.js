@@ -12,6 +12,7 @@ const pool = mysql.createPool({
 });
 
 // Funciones de Usuario
+//Esta funcion registra al usuario
 export async function registerUser(nombre, correo_electronico, contrasena, acepta_terminos) {
     try {
         const query = 'INSERT INTO Usuario (nombre, correo_electronico, contrasena, acepta_terminos) VALUES (?, ?, ?, ?)';
@@ -21,7 +22,7 @@ export async function registerUser(nombre, correo_electronico, contrasena, acept
         throw error;
     }
 }
-
+//Esta funcion loguea al usuario
 export async function loginUser(correo_electronico, contrasena) {
     try {
         if (!correo_electronico || !contrasena) {
@@ -41,6 +42,10 @@ export async function loginUser(correo_electronico, contrasena) {
     }
 }
 
+// esta funcion muestra toda la informacion del usuario 
+//desde  id , nombre , correo_electronico ,contrasena , acepta_terminos , fecha_creacion
+// muestra que categorias tiene vinculadas junto con toda su informacion
+//Muestra artículos vinculados a cada categoría, todo esto segun el id de usuario
 export async function getUserById(id) {
     try {
         // Consulta principal del usuario
@@ -119,10 +124,10 @@ export async function updateCategory(id, nombre, icono, color) {
         throw error;
     }
 }
-
+//// Elimina la categoría usando su ID
 export async function deleteCategory(id) {
     try {
-        const query = 'DELETE FROM Categoria WHERE id = ?'; // Asegúrate de que el nombre de la tabla y el campo sean correctos
+        const query = 'DELETE FROM Categoria WHERE id = ?'; 
         const [results] = await pool.execute(query, [id]);
         if (results.affectedRows === 0) {
             throw new Error('Categoría no encontrada');
@@ -133,6 +138,7 @@ export async function deleteCategory(id) {
         throw error;
     }
 }
+
 
 export async function categoryExists(id_categoria) {
     try {
@@ -145,6 +151,7 @@ export async function categoryExists(id_categoria) {
 }
 
 // Funciones de Artículo
+//crea el articulo
 export async function createArticle(titulo, texto, prioridad, id_categoria) {
     try {
         const query = 'INSERT INTO Articulo (titulo, texto, prioridad, id_categoria) VALUES (?, ?, ?, ?)';
