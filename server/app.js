@@ -16,7 +16,8 @@ import {
     getArticleCountByUserId,
     categoryExists,
     updatePassword,
-    updateUserName
+    updateUserName,
+    updateUserEmail
 } from './database.js';
 
 // Crea una instancia de Express
@@ -268,6 +269,28 @@ app.put('/user/:id/name', authenticate, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// Ruta para actualizar el correo electrónico del usuario
+app.put('/user/:id/email', authenticate, async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const { nuevoCorreo } = req.body;
+
+        if (!nuevoCorreo) {
+            return res.status(400).json({ error: 'Nuevo correo electrónico es requerido' });
+        }
+
+        const result = await updateUserEmail(userId, nuevoCorreo);
+
+        if (result.affectedRows > 0) {
+            res.status(200).json({ message: 'Correo electrónico actualizado con éxito' });
+        } else {
+            res.status(404).json({ error: 'Usuario no encontrado o correo electrónico no cambiado' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 // Inicia el servidor
 const PORT = process.env.PORT || 8080;

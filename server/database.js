@@ -265,3 +265,20 @@ export async function updateUserName(userId, newName) {
         throw error;
     }
 }
+
+export async function updateUserEmail(userId, newEmail) {
+    try {
+        // Consulta para actualizar el correo electrónico del usuario
+        const query = 'UPDATE Usuario SET correo_electronico = ? WHERE id = ?';
+        const [results] = await pool.execute(query, [newEmail, userId]);
+
+        if (results.affectedRows === 0) {
+            throw new Error('Usuario no encontrado o correo electrónico no cambiado');
+        }
+
+        return results;
+    } catch (error) {
+        throw error;
+    }
+}
+
