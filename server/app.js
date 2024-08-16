@@ -17,7 +17,9 @@ import {
     categoryExists,
     updatePassword,
     updateUserName,
-    updateUserEmail
+    updateUserEmail,    
+    searchCategoriesAndArticles
+
 } from './database.js';
 
 // Crea una instancia de Express
@@ -290,7 +292,17 @@ app.put('/user/:id/email', authenticate, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-
+//Ruta para búsqueda 
+app.get('/Buscar/:id', async (req, res) => {
+    try {
+        const { query } = req.query;
+        const id_usuario = req.params.id; // Obtén id_usuario de los parámetros de la URL
+        const results = await searchCategoriesAndArticles(query, id_usuario);
+        res.json(results);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Inicia el servidor
 const PORT = process.env.PORT || 8080;

@@ -1,6 +1,5 @@
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-import bcrypt from 'bcrypt';
 
 dotenv.config();
 
@@ -277,6 +276,37 @@ export async function updateUserEmail(userId, newEmail) {
         }
 
         return results;
+    } catch (error) {
+        throw error;
+    }
+}
+export async function searchCategoriesAndArticles(query, id_usuario) {
+    try {
+        if (!query || !id_usuario) {
+            throw new Error("Se requieren tanto query como id_usuario.");
+        }
+
+        const searchQuery = `%${query}%`; // Formatea el término de búsqueda para LIKE
+
+        // Consulta para buscar en Categoria
+        const [categorias] = await pool.execute(
+            `SELECT 'categoria' as tipo, id, nombre AS titulo 
+            FROM Categoria 
+            WHERE id_usuario = ? AND nombre LIKE ?`,
+            [id_usuario, searchQuery]
+        );
+
+        // Consulta para buscar en Articulo
+        const [articulos] = await pool.execute(
+            `SELECT 'articulo' as tipo, id, titulo 
+            FROM Articulo 
+            WHERE id_categoria IN (SELECT id FROM Categoria WHERE id_usuario = ?) 
+            AND (titulo LIKE ? OR texto LIKE ?)`,
+            [id_usuario, searchQuery, searchQuery]
+        );
+
+        // Combina los resultados
+        return [...categorias, ...articulos];
     } catch (error) {
         throw error;
     }
