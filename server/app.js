@@ -14,7 +14,9 @@ import {
     updateArticle, 
     deleteArticle,
     getArticleCountByUserId,
-    categoryExists
+    categoryExists,
+    updatePassword,
+    updateUserName
 } from './database.js';
 
 // Crea una instancia de Express
@@ -222,6 +224,46 @@ app.delete('/articles/:id', authenticate, async (req, res) => {
     try {
         await deleteArticle(req.params.id);
         res.status(204).end();
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/user/:id/password', authenticate, async (req, res) => {
+    try {
+        const { contrasenaActual, nuevaContrasena } = req.body;
+        const userId = req.params.id;
+
+        if (!contrasenaActual || !nuevaContrasena) {
+            return res.status(400).json({ error: 'Contraseña actual y nueva contraseña son requeridas' });
+        }
+
+        // Llama a la función para actualizar la contraseña
+        const result = await updatePassword(userId, contrasenaActual, nuevaContrasena);
+
+        res.status(200).json({ message: 'Contraseña actualizada con éxito' });
+    } catch (error) {
+        // Envía un mensaje de error específico según el problema
+        res.status(500).json({ error: error.message });
+    }
+});
+// Ruta para actualizar el nombre del usuario
+app.put('/user/:id/name', authenticate, async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const { nuevoNombre } = req.body;
+
+        if (!nuevoNombre) {
+            return res.status(400).json({ error: 'Nuevo nombre es requerido' });
+        }
+
+        const result = await updateUserName(userId, nuevoNombre);
+
+        if (result.affectedRows > 0) {
+            res.status(200).json({ message: 'Nombre actualizado con éxito' });
+        } else {
+            res.status(404).json({ error: 'Usuario no encontrado' });
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

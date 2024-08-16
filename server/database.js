@@ -1,5 +1,6 @@
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
+import bcrypt from 'bcrypt';
 
 dotenv.config();
 
@@ -212,6 +213,53 @@ export async function deleteArticle(id) {
     try {
         const query = 'DELETE FROM Articulo WHERE id = ?';
         const [results] = await pool.execute(query, [id]);
+        return results;
+    } catch (error) {
+        throw error;
+    }
+}
+
+// Función para verificar la contraseña actual y actualizarla
+export async function updatePassword(userId, currentPassword, nuevaContrasena) {
+    try {
+        // Recuperar la contraseña almacenada
+        const query = 'SELECT contrasena FROM Usuario WHERE id = ?';
+        const [rows] = await pool.execute(query, [userId]);
+
+        if (rows.length === 0) {
+            throw new Error('Usuario no encontrado');
+        }
+
+        const storedPassword = rows[0].contrasena;
+
+        // Comparar la contraseña actual con la almacenada
+        if (currentPassword !== storedPassword) {
+            throw new Error('Contraseña actual incorrecta');
+        }
+
+        // Actualizar la contraseña en la base de datos
+        const updateQuery = 'UPDATE Usuario SET contrasena = ? WHERE id = ?';
+        const [results] = await pool.execute(updateQuery, [nuevaContrasena, userId]);
+
+        if (results.affectedRows === 0) {
+            throw new Error('No se pudo actualizar la contraseña');
+        }
+
+        return results;
+    } catch (error) {
+        throw error;
+    }
+}
+export async function updateUserName(userId, newName) {
+    try {
+        // Consulta para actualizar el nombre del usuario
+        const query = 'UPDATE Usuario SET nombre = ? WHERE id = ?';
+        const [results] = await pool.execute(query, [newName, userId]);
+
+        if (results.affectedRows === 0) {
+            throw new Error('Usuario no encontrado o nombre no cambiado');
+        }
+
         return results;
     } catch (error) {
         throw error;
