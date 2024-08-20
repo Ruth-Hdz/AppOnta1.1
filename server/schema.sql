@@ -27,6 +27,18 @@ CREATE TABLE Categoria (
     FOREIGN KEY (id_usuario) REFERENCES Usuario(id)
 );
 
+ALTER TABLE articulo
+MODIFY COLUMN prioridad VARCHAR(3);
+ALTER TABLE articulo
+ADD COLUMN fecha_actualizacion DATETIME DEFAULT NULL;
+UPDATE articulo
+SET prioridad = 'Sí',
+    fecha_actualizacion = NOW()
+WHERE id = 1;
+SELECT * FROM articulo
+WHERE prioridad = 'Sí'
+ORDER BY fecha_actualizacion DESC;
+
 -- Crear la tabla Articulo
 CREATE TABLE Articulo (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -37,6 +49,14 @@ CREATE TABLE Articulo (
     id_categoria INT,
     FOREIGN KEY (id_categoria) REFERENCES Categoria(id)
 );
+CREATE TABLE PasswordResetTokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    correo_electronico VARCHAR(255) NOT NULL,
+    token VARCHAR(64) NOT NULL,
+    expiracion DATETIME NOT NULL,
+    FOREIGN KEY (correo_electronico) REFERENCES Usuario(correo_electronico)
+);
+ALTER TABLE Articulo ADD COLUMN id_usuario INT;
 
 -- Insertar usuarios de ejemplo
 INSERT INTO Usuario (nombre, correo_electronico, contrasena, acepta_terminos) VALUES

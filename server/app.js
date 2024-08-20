@@ -1,25 +1,29 @@
 import express from 'express';
 import cors from 'cors';
 import { 
+    pool,
     getUserById, 
     registerUser, 
     loginUser, 
-    deleteUser, 
-    createCategory, 
-    getCategoriesByUserId, 
-    updateCategory, 
-    deleteCategory, 
     createArticle,
-    getArticlesByUserId, 
-    updateArticle, 
-    deleteArticle,
-    getArticleCountByUserId,
-    categoryExists,
-    updatePassword,
+    createCategory,
+    updateArticle,
     updateUserName,
-    updateUserEmail,    
-    searchCategoriesAndArticles
-
+    updateUserEmail,
+    updatePassword,
+    searchCategoriesAndArticles,
+    search_articles_by_date,
+    getCategoriesByUserId,
+    deleteCategory,
+    deleteArticle,
+    getArticlesByPriority,
+    updateArticlePriority,
+    getArticlesByCategoryId,
+    getCategoriesWithArticleCount,
+    createPasswordResetToken, 
+    resetPasswordWithToken,
+    
+    
 } from './database.js';
 
 // Crea una instancia de Express
@@ -41,6 +45,38 @@ const authenticate = (req, res, next) => {
     next();
 };
 
+// Ruta para solicitar recuperación de contraseña
+app.post('/forgot-password', async (req, res) => {
+    try {
+      const { correo_electronico } = req.body;
+      
+      // Check if the user exists
+      const [user] = await pool.execute('SELECT id FROM Usuario WHERE correo_electronico = ?', [correo_electronico]);
+      
+      if (user.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+  
+      // Generate and store the token
+      const token = await createPasswordResetToken(user[0].id);
+  
+      res.json({ message: 'Token de recuperación generado', token });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+// Ruta para restablecer la contraseña
+app.post('/reset-password', async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+
+        await resetPasswordWithToken(token, newPassword);
+
+        res.json({ message: 'Contraseña actualizada con éxito' });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
 // Rutas de Usuario
 app.post('/register', async (req, res) => {
     try {
@@ -74,11 +110,15 @@ app.post('/login', async (req, res) => {
 
     try {
         const user = await loginUser(correo_electronico, contrasena);
-        res.status(200).json({ user });
+        res.status(200).json({ 
+            message: 'Usuario logueado con éxito', // Mensaje de éxito
+            user 
+        });
     } catch (error) {
         res.status(401).json({ error: error.message });
     }
 });
+
 
 app.get('/user/:id', authenticate, async (req, res) => {
     try {
@@ -88,28 +128,27 @@ app.get('/user/:id', authenticate, async (req, res) => {
         res.status(404).json({ error: error.message });
     }
 });
-
-app.get('/article_count/:id_usuario', authenticate, async (req, res) => {
+//crear articulo
+// Crear artículo sin autenticación
+// Crear artículo
+app.post('/articles', async (req, res) => {
     try {
-        const id_usuario = req.params.id_usuario;
-        if (!id_usuario) {
-            return res.status(400).json({ error: 'User ID is missing' });
+        const { titulo, texto, prioridad, id_categoria, id_usuario } = req.body;
+
+        // Llama a la función createArticle con id_usuario
+        const result = await createArticle(titulo, texto, prioridad, id_categoria, id_usuario);
+
+        // Verifica si se creó al menos una fila
+        if (result.affectedRows > 0) {
+            res.json({ message: 'Artículo creado con éxito', result });
+        } else {
+            res.status(404).json({ message: 'Artículo no creado' });
         }
-        const articleCount = await getArticleCountByUserId(id_usuario);
-        res.json({ numero_articulos: articleCount });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.delete('/user/:id', authenticate, async (req, res) => {
-    try {
-        await deleteUser(req.params.id);
-        res.status(204).end();
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
 
 // Rutas de Categoría
 app.post('/categories', authenticate, async (req, res) => {
@@ -135,122 +174,28 @@ app.post('/categories', authenticate, async (req, res) => {
         res.status(500).json({ error: 'Error al crear la categoría' });
     }
 });
-
-
-app.get('/categories/:id_usuario', authenticate, async (req, res) => {
-    try {
-        const categories = await getCategoriesByUserId(req.params.id_usuario);
-        res.json(categories);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.put('/categories/:id', authenticate, async (req, res) => {
-    try {
-        const { nombre, icono, color } = req.body;
-        const result = await updateCategory(req.params.id, nombre, icono, color);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.delete('/categories/:id', authenticate, async (req, res) => {
-    try {
-        await deleteCategory(req.params.id);
-        res.status(200).send('Category deleted');
-    } catch (error) {
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-// Rutas de Artículo
-app.post('/articles', authenticate, async (req, res) => {
-    try {
-        const { titulo, texto, prioridad, id_categoria } = req.body;
-
-        if (!titulo || !id_categoria) {
-            return res.status(400).json({ error: 'Faltan datos requeridos' });
-        }
-
-        const categoryExistsResult = await categoryExists(id_categoria);
-        if (!categoryExistsResult) {
-            return res.status(400).json({ error: 'Categoría no encontrada' });
-        }
-
-        const result = await createArticle(titulo, texto, prioridad, id_categoria);
-
-        // Añade el mensaje de éxito junto con la respuesta del artículo creado
-        res.status(201).json({
-            message: 'Artículo creado con éxito',
-            article: result
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Error al crear el artículo' });
-    }
-});
-
-app.get('/articles_list/:id', async (req, res) => {
-    try {
-        const id = req.params.id;
-        if (!id) {
-            return res.status(400).json({ error: 'User ID is missing' });
-        }
-        const articles = await getArticlesByUserId(id);
-        res.json(articles);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// CREACION DE ARTICULO
+//Actualizar Articulo
 app.put('/articles/:id', authenticate, async (req, res) => {
     try {
-        const { titulo, texto, prioridad, id_categoria } = req.body;
-        const result = await updateArticle(req.params.id, titulo, texto, prioridad, id_categoria);
+        const { id } = req.params;
+        const { titulo } = req.body;
 
-        // Verifica si se actualizó al menos una fila
+        if (!titulo) {
+            return res.status(400).json({ error: 'El título es requerido' });
+        }
+
+        const result = await updateArticle(id, titulo);
+
         if (result.affectedRows > 0) {
-            res.json({ message: 'Artículo actualizado con éxito', result });
+            res.json({ message: 'Título del artículo actualizado con éxito' });
         } else {
-            res.status(404).json({ message: 'Artículo no encontrado' });
+            res.status(404).json({ error: 'Artículo no encontrado' });
         }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
-
-
-app.delete('/articles/:id', authenticate, async (req, res) => {
-    try {
-        await deleteArticle(req.params.id);
-        res.status(204).end();
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.put('/user/:id/password', authenticate, async (req, res) => {
-    try {
-        const { contrasenaActual, nuevaContrasena } = req.body;
-        const userId = req.params.id;
-
-        if (!contrasenaActual || !nuevaContrasena) {
-            return res.status(400).json({ error: 'Contraseña actual y nueva contraseña son requeridas' });
-        }
-
-        // Llama a la función para actualizar la contraseña
-        const result = await updatePassword(userId, contrasenaActual, nuevaContrasena);
-
-        res.status(200).json({ message: 'Contraseña actualizada con éxito' });
-    } catch (error) {
-        // Envía un mensaje de error específico según el problema
-        res.status(500).json({ error: error.message });
-    }
-});
-// Ruta para actualizar el nombre del usuario
+//Actualizar nombre de usuario
 app.put('/user/:id/name', authenticate, async (req, res) => {
     try {
         const userId = req.params.id;
@@ -271,6 +216,7 @@ app.put('/user/:id/name', authenticate, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
 // Ruta para actualizar el correo electrónico del usuario
 app.put('/user/:id/email', authenticate, async (req, res) => {
     try {
@@ -299,6 +245,145 @@ app.get('/Buscar/:id', async (req, res) => {
         const id_usuario = req.params.id; // Obtén id_usuario de los parámetros de la URL
         const results = await searchCategoriesAndArticles(query, id_usuario);
         res.json(results);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+//actualizar contraseña
+app.put('/user/:id/password', authenticate, async (req, res) => {
+    try {
+        const { contrasenaActual, nuevaContrasena } = req.body;
+        const userId = req.params.id;
+
+        if (!contrasenaActual || !nuevaContrasena) {
+            return res.status(400).json({ error: 'Contraseña actual y nueva contraseña son requeridas' });
+        }
+
+        // Llama a la función para actualizar la contraseña
+        const result = await updatePassword(userId, contrasenaActual, nuevaContrasena);
+
+        res.status(200).json({ message: 'Contraseña actualizada con éxito' });
+    } catch (error) {
+        // Envía un mensaje de error específico según el problema
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/search_articles_by_date/:id_usuario', async (req, res) => {
+    try {
+        const id_usuario = req.params.id_usuario;
+        const { fecha } = req.query; // Obtener fecha desde los parámetros de consulta
+
+        // Validar los parámetros
+        if (!fecha) {
+            return res.status(400).json({ error: 'Fecha requerida' });
+        }
+
+        // Llamar a la función de búsqueda
+        const results = await search_articles_by_date(id_usuario, fecha); // Llama a la función sin el parámetro query
+        res.json(results);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/categories/:id_usuario', authenticate, async (req, res) => {
+    try {
+        const categories = await getCategoriesByUserId(req.params.id_usuario);
+        res.json(categories);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/categories/:id', authenticate, async (req, res) => {
+    try {
+        await deleteCategory(req.params.id);
+        res.status(200).send('Categoría eliminada');
+    } catch (error) {
+        res.status(500).send('Error Interno del Servidor');
+    }
+});
+
+// Ruta para eliminar un artículo
+app.delete('/articles/:id', authenticate, async (req, res) => {
+    try {
+        await deleteArticle(req.params.id);
+        res.status(200).send('Artículo eliminado');
+    } catch (error) {
+        res.status(500).send('Error Interno del Servidor');
+    }
+});
+
+// Ruta para obtener artículos por prioridad
+app.get('/articles/priority', authenticate, async (req, res) => {
+    try {
+        const { id_usuario } = req.query;
+
+        if (!id_usuario) {
+            return res.status(400).json({ error: 'ID de usuario es requerido' });
+        }
+
+        const articles = await getArticlesByPriority(id_usuario);
+
+        if (articles.length > 0) {
+            res.status(200).json(articles);
+        } else {
+            res.status(404).json({ message: 'No se encontraron artículos' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Ruta para actualizar la prioridad de un artículo
+app.put('/articles/:id/priority', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { prioridad } = req.body;
+
+        if (typeof prioridad !== 'boolean') {
+            return res.status(400).json({ error: 'Prioridad debe ser true o false' });
+        }
+
+        const result = await updateArticlePriority(id, prioridad);
+
+        if (result.affectedRows > 0) {
+            res.json({ message: 'Prioridad del artículo actualizada con éxito' });
+        } else {
+            res.status(404).json({ error: 'Artículo no encontrado' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Ruta para obtener artículos por ID de categoría
+app.get('/articles/category/:id_categoria', async (req, res) => {
+    try {
+        const id_categoria = parseInt(req.params.id_categoria, 10);
+
+        if (isNaN(id_categoria)) {
+            return res.status(400).json({ error: 'ID de categoría inválido' });
+        }
+
+        const articles = await getArticlesByCategoryId(id_categoria);
+
+        if (articles.length > 0) {
+            res.status(200).json(articles);
+        } else {
+            res.status(404).json({ message: 'No se encontraron artículos para esta categoría' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// Ruta para obtener el número de artículos por categoría
+app.get('/categories/article-count/:id_usuario', async (req, res) => {
+    try {
+        const id_usuario = req.params.id_usuario;
+        const result = await getCategoriesWithArticleCount(id_usuario);
+        res.json(result);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
