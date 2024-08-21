@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import { 
-    pool,
     getUserById, 
     registerUser, 
     loginUser, 
@@ -20,8 +19,6 @@ import {
     updateArticlePriority,
     getArticlesByCategoryId,
     getCategoriesWithArticleCount,
-    createPasswordResetToken, 
-    resetPasswordWithToken,
     
     
 } from './database.js';
@@ -39,44 +36,9 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Middleware para verificar autenticación (ejemplo de protección de ruta)
-const authenticate = (req, res, next) => {
-    // Implementa tu lógica de autenticación aquí
-    next();
-};
 
-// Ruta para solicitar recuperación de contraseña
-app.post('/forgot-password', async (req, res) => {
-    try {
-      const { correo_electronico } = req.body;
-      
-      // Check if the user exists
-      const [user] = await pool.execute('SELECT id FROM Usuario WHERE correo_electronico = ?', [correo_electronico]);
-      
-      if (user.length === 0) {
-        return res.status(404).json({ error: 'Usuario no encontrado' });
-      }
-  
-      // Generate and store the token
-      const token = await createPasswordResetToken(user[0].id);
-  
-      res.json({ message: 'Token de recuperación generado', token });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-// Ruta para restablecer la contraseña
-app.post('/reset-password', async (req, res) => {
-    try {
-        const { token, newPassword } = req.body;
 
-        await resetPasswordWithToken(token, newPassword);
 
-        res.json({ message: 'Contraseña actualizada con éxito' });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
 // Rutas de Usuario
 app.post('/register', async (req, res) => {
     try {
