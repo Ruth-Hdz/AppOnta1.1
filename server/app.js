@@ -36,51 +36,76 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-
+const authenticate = async (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1]; // Suponiendo que envías el token en el header Authorization: Bearer <token>
+    if (!token) {
+        return res.status(401).json({ error: 'No autorizado, token no proporcionado' });
+    }
+    try {
+        const decodedToken = await auth.verifyIdToken(token); // Verifica el token usando Firebase
+        req.user = decodedToken; // Agrega los datos decodificados del usuario a la solicitud
+        next(); // Continúa al siguiente middleware o controlador
+    } catch (error) {
+        res.status(401).json({ error: 'No autorizado, token inválido' });
+    }
+};
 
 
 // Rutas de Usuario
 app.post('/register', async (req, res) => {
     try {
         const { nombre, correo_electronico, contrasena, acepta_terminos } = req.body;
+
+        // Verification of required fields
         if (!nombre || !correo_electronico || !contrasena || !acepta_terminos) {
             return res.status(400).json({ error: 'Todos los campos son requeridos' });
         }
 
+        // Call to registerUser function
         const result = await registerUser(nombre, correo_electronico, contrasena, acepta_terminos);
 
-        if (result.affectedRows > 0) {
+        // Verification of successful insertion
+        if (result && result.userId) {
             res.status(201).json({
                 message: 'Usuario registrado con éxito',
-                userId: result.insertId
+                userId: result.userId,
+                firebaseUserId: result.firebaseUserId,
             });
         } else {
-            res.status(400).json({ message: 'No se pudo registrar al usuario' });
+            res.status(400).json({ error: 'No se pudo registrar al usuario' });
         }
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error al registrar el usuario:', error);
+        res.status(500).json({ error: 'Error al registrar el usuario. Intente nuevamente más tarde.' });
     }
 });
 
 app.post('/login', async (req, res) => {
-    console.log('Datos recibidos:', req.body);
-    const { correo_electronico, contrasena } = req.body;
-
-    if (!correo_electronico || !contrasena) {
-        return res.status(400).json({ error: 'Email o contraseña no proporcionados' });
-    }
-
     try {
-        const user = await loginUser(correo_electronico, contrasena);
-        res.status(200).json({ 
-            message: 'Usuario logueado con éxito', // Mensaje de éxito
-            user 
-        });
+        const { correo_electronico, contrasena } = req.body;
+
+        // Verificación de campos requeridos
+        if (!correo_electronico || !contrasena) {
+            return res.status(400).json({ error: 'Correo electrónico y contraseña son requeridos' });
+        }
+
+        // Llamada a la función loginUser
+        const result = await loginUser(correo_electronico, contrasena);
+
+        if (result) {
+            res.status(200).json({
+                message: 'Inicio de sesión exitoso',
+                userId: result.userId,
+                firebaseUserId: result.firebaseUserId,
+            });
+        } else {
+            res.status(401).json({ error: 'Credenciales incorrectas' });
+        }
     } catch (error) {
-        res.status(401).json({ error: error.message });
+        console.error('Error al iniciar sesión:', error);
+        res.status(500).json({ error: 'Error al iniciar sesión. Intente nuevamente más tarde.' });
     }
 });
-
 
 app.get('/user/:id', authenticate, async (req, res) => {
     try {

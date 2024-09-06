@@ -7,7 +7,18 @@ DROP TABLE IF EXISTS Articulo;
 DROP TABLE IF EXISTS Categoria;
 DROP TABLE IF EXISTS Usuario;
 
--- Crear la tabla Usuario
+CREATE TABLE Usuario (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    correo_electronico VARCHAR(255) NOT NULL UNIQUE,
+    acepta_terminos BOOLEAN NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    firebase_uid VARCHAR(255) NOT NULL,
+    token_recuperacion VARCHAR(255), 
+    token_expiracion TIMESTAMP
+);
+
+-- Crear la tabla Usuario UNIQUE EN EL ID DE USUARIO
 CREATE TABLE Usuario (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL,

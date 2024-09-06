@@ -1,7 +1,9 @@
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-import crypto from 'crypto';
-// At the end of database.js
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from './firebaseConfig.js';
+
 export { pool };
 dotenv.config();
 
@@ -19,32 +21,71 @@ const pool = mysql.createPool({
 // Funciones de Usuario
 //Esta funcion registra al usuario
 export async function registerUser(nombre, correo_electronico, contrasena, acepta_terminos) {
+    const connection = await pool.getConnection();
     try {
-        const query = 'INSERT INTO Usuario (nombre, correo_electronico, contrasena, acepta_terminos) VALUES (?, ?, ?, ?)';
-        const [results] = await pool.execute(query, [nombre, correo_electronico, contrasena, acepta_terminos]);
-        return results;
+        await connection.beginTransaction();
+        console.log('Transaction begun');
+
+        // Register user in Firebase Authentication
+        console.log('Attempting to create user in Firebase');
+        const userCredential = await createUserWithEmailAndPassword(auth, correo_electronico, contrasena);
+        const user = userCredential.user;
+        console.log('User created in Firebase:', user.uid);
+
+        // Save additional information in MySQL database
+        const query = `
+            INSERT INTO usuario (nombre, correo_electronico, acepta_terminos, firebase_uid, fecha_creacion)
+            VALUES (?, ?, ?, ?, NOW())
+        `;
+        console.log('Executing MySQL query:', query);
+        const [results] = await connection.execute(query, [nombre, correo_electronico, acepta_terminos, user.uid]);
+        console.log('MySQL query results:', results);
+
+        await connection.commit();
+        console.log('Transaction committed');
+
+        return { userId: results.insertId, firebaseUserId: user.uid };
     } catch (error) {
+        await connection.rollback();
+        console.error("Error al registrar el usuario:", error);
         throw error;
+    } finally {
+        connection.release();
     }
 }
-//Esta funcion loguea al usuario
+
+
 export async function loginUser(correo_electronico, contrasena) {
+    const connection = await pool.getConnection();
     try {
-        if (!correo_electronico || !contrasena) {
-            throw new Error('Email o contraseña no proporcionados');
-        }
+        // Verificar usuario en Firebase Authentication
+        console.log('Iniciando sesión en Firebase con:', correo_electronico);
+        const userCredential = await signInWithEmailAndPassword(auth, correo_electronico, contrasena);
+        const user = userCredential.user;
+        console.log('Usuario autenticado en Firebase:', user.uid);
 
-        const query = 'SELECT * FROM Usuario WHERE correo_electronico = ? AND contrasena = ?';
-        const [rows] = await pool.execute(query, [correo_electronico, contrasena]);
+        // Buscar usuario en la base de datos MySQL
+        const query = `
+            SELECT id 
+            FROM usuario 
+            WHERE correo_electronico = ? AND firebase_uid = ?
+        `;
+        const [results] = await connection.execute(query, [correo_electronico, user.uid]);
 
-        if (rows.length === 0) {
-            throw new Error('Credenciales inválidas');
+        if (results.length > 0) {
+            return { userId: results[0].id, firebaseUserId: user.uid };
+        } else {
+            console.log('Usuario no encontrado en MySQL');
+            return null;
         }
-        return rows[0];
     } catch (error) {
+        console.error('Error al iniciar sesión en Firebase o MySQL:', error);
         throw error;
+    } finally {
+        connection.release();
     }
 }
+
 
 // esta funcion muestra toda la informacion del usuario 
 //desde  id , nombre , correo_electronico ,contrasena , acepta_terminos , fecha_creacion
@@ -55,11 +96,11 @@ export async function getUserById(id) {
         // Consulta principal del usuario
         const userQuery = 'SELECT * FROM Usuario WHERE id = ?';
         const [userRows] = await pool.execute(userQuery, [id]);
-        
+
         if (userRows.length === 0) {
             throw new Error('Usuario no encontrado');
         }
-        
+
         const user = userRows[0];
 
         // Consulta para obtener categorías vinculadas al usuario
